@@ -3,18 +3,34 @@ const dotenv = require('dotenv')
 const { MongoClient } = require('mongodb'); 
 const bodyparser = require('body-parser')
 const cors = require('cors')
+const path = require('path')
 
-dotenv.config()
+// Load environment variables from backend/.env
+dotenv.config({ path: path.join(__dirname, '.env') })
 
 // Connecting to the MongoDB Client
 const url = process.env.MONGO_URI;
+if (!url) {
+    console.error('ERROR: MONGO_URI is not defined in .env file');
+    process.exit(1);
+}
+
 const client = new MongoClient(url);
-client.connect();
+
+// Connect with error handling
+client.connect()
+    .then(() => console.log('✅ Connected to MongoDB'))
+    .catch(err => {
+        console.error('❌ MongoDB connection error:', err);
+        process.exit(1);
+    });
 
 // App & Database
-const dbName = process.env.DB_NAME 
+const dbName = process.env.DB_NAME || 'passop'
 const app = express()
-const port = 3000 
+const port = 3000
+
+console.log(`🔧 Using database: ${dbName}`)
 
 // Middleware
 app.use(bodyparser.json())
@@ -55,5 +71,9 @@ app.delete('/api/passwords', async (req, res) => {
 })
 
 app.listen(port, () => {
-    console.log(`Example app listening on  http://localhost:${port}`)
+    console.log(`🚀 Server running on http://localhost:${port}`)
+    console.log(`📊 API endpoints:`)
+    console.log(`   GET    http://localhost:${port}/api/passwords`)
+    console.log(`   POST   http://localhost:${port}/api/passwords`)
+    console.log(`   DELETE http://localhost:${port}/api/passwords`)
 })

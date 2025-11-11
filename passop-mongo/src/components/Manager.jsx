@@ -11,9 +11,14 @@ const Manager = () => {
     const [passwordArray, setPasswordArray] = useState([])
 
     const getPasswords = async () => {
-    let req = await fetch("http://localhost:3000/api/passwords")
-    let passwords = await req.json()
-    setPasswordArray(passwords)
+        try {
+            let req = await fetch("http://localhost:3000/api/passwords");
+            let passwords = await req.json();
+            setPasswordArray(passwords);
+        } catch (err) {
+            console.error("Error fetching passwords:", err);
+            setPasswordArray([]);
+        }
     }
 
     useEffect(() => {
@@ -49,48 +54,103 @@ const Manager = () => {
 
     const savePassword = async () => {
         if (form.site.length > 3 && form.username.length > 3 && form.password.length > 3) {
-            // If any such id exists in the db, delete it 
-            await fetch("http://localhost:3000/api/passwords", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: form.id }) })
-            setPasswordArray([...passwordArray, { ...form, id: uuidv4() }])
-            await fetch("http://localhost:3000/api/passwords", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, id: uuidv4() }) })
-            // Otherwise clear the form and show toast
-            setform({ site: "", username: "", password: "" })
-            toast('Password saved!', {
+            try {
+                // Remove if editing
+                if (form.id) {
+                    const deleteRes = await fetch("http://localhost:3000/api/passwords", { 
+                        method: "DELETE", 
+                        headers: { "Content-Type": "application/json" }, 
+                        body: JSON.stringify({ id: form.id }) 
+                    });
+                    if (!deleteRes.ok) {
+                        throw new Error('Failed to delete old password');
+                    }
+                }
+                
+                // Add new (keep id if editing, else generate new)
+                const newPassword = { ...form, id: form.id ? form.id : uuidv4() };
+                const saveRes = await fetch("http://localhost:3000/api/passwords", { 
+                    method: "POST", 
+                    headers: { "Content-Type": "application/json" }, 
+                    body: JSON.stringify(newPassword) 
+                });
+                
+                if (!saveRes.ok) {
+                    throw new Error('Failed to save password');
+                }
+                
+                setform({ site: "", username: "", password: "" });
+                toast.success('Password saved!', {
+                    position: "top-right",
+                    autoClose: 5000,
+                    hideProgressBar: false,
+                    closeOnClick: true,
+                    pauseOnHover: true,
+                    draggable: true,
+                    progress: undefined,
+                    theme: "dark",
+                });
+                await getPasswords();
+            } catch (error) {
+                console.error('Save error:', error);
+                toast.error('Error: Could not save password. Make sure the backend server is running!', {
+                    position: "top-right",
+                    autoClose: 5000,
+                    theme: "dark",
+                });
+            }
+        } else {
+            toast.warning('Error: All fields must be at least 3 characters long!', {
                 position: "top-right",
                 autoClose: 5000,
-                hideProgressBar: false,
-                closeOnClick: true,
-                pauseOnHover: true,
-                draggable: true,
-                progress: undefined,
                 theme: "dark",
             });
-        }
-        else {
-            toast('Error: Password not saved!');
         }
     }
 
     const deletePassword = async (id) => {
-        console.log("Deleting password with id ", id)
-        let c = confirm("Do you really want to delete this password?")
+        console.log("Deleting password with id ", id);
+        let c = confirm("Do you really want to delete this password?");
         if (c) {
-            setPasswordArray(passwordArray.filter(item => item.id !== id))
-            await fetch("http://localhost:3000/api/passwords", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) })
-            toast('Password Deleted!', {
-                position: "top-right",
-                autoClose: 5000,
-                hideProgressBar: false,
-                closeOnClick: true, 
-                draggable: true,
-                progress: undefined,
-                theme: "dark",
-            });
+            try {
+                const res = await fetch("http://localhost:3000/api/passwords", { 
+                    method: "DELETE", 
+                    headers: { "Content-Type": "application/json" }, 
+                    body: JSON.stringify({ id }) 
+                });
+                
+                if (!res.ok) {
+                    throw new Error('Failed to delete password');
+                }
+                
+                toast.success('Password Deleted!', {
+                    position: "top-right",
+                    autoClose: 5000,
+                    hideProgressBar: false,
+                    closeOnClick: true,
+                    pauseOnHover: true,
+                    draggable: true,
+                    progress: undefined,
+                    theme: "dark",
+                });
+                await getPasswords();
+            } catch (error) {
+                console.error('Delete error:', error);
+                toast.error('Error: Could not delete password!', {
+                    position: "top-right",
+                    autoClose: 5000,
+                    theme: "dark",
+                });
+            }
         }
     }
 
     const editPassword = (id) => {
-        setform({ ...passwordArray.filter(i => i.id === id)[0], id: id })
+        console.log("Editing password with id ", id);
+        const item = passwordArray.find(i => i.id === id);
+        if (item) {
+            setform(item); // keep the original id
+        }
         setPasswordArray(passwordArray.filter(item => item.id !== id))
     }
 
